@@ -1,0 +1,6 @@
+# Keep the build context small and free of secrets / build output.
+target/
+**/target/
+.env
+**/.env
+**/*.tmp

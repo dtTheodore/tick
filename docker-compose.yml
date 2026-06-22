@@ -1,0 +1,38 @@
+# Per-worktree local infrastructure.
+#
+# Container names and the data volume bind-mount are namespaced by
+# COMPOSE_PROJECT_NAME (set by scripts/worktree-env.sh), so multiple
+# worktrees of this repo can run side-by-side without colliding.
+# Data lives under ./.local/postgres-data and is gitignored.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dopamint
+      POSTGRES_PASSWORD: dopamint
+      POSTGRES_DB: dopamint
+    ports:
+      - "${PLATFORM_DB_PORT}:5432"
+    volumes:
+      - ./.local/postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dopamint -d dopamint"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${PLATFORM_REDIS_PORT}:6379"
+    volumes:
+      - ./.local/redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 20

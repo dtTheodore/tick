@@ -1,0 +1,45 @@
+{
+  "v": 1,
+  "position_id": "0xexample_position",
+  "vault_id": "0xexample_vault",
+  "owner": "0xexample_owner",
+  "asset": "BTC",
+  "band": {
+    "lo": 70000000000000,
+    "hi": 70010000000000
+  },
+  "window": {
+    "t_open_ms": 2000,
+    "t_close_ms": 12000
+  },
+  "stake": 1000000,
+  "multiplier_bps": 10476,
+  "quote_at_tap": {
+    "oracle_run_id": 1,
+    "oracle_seq": 0,
+    "tap_ms": 1000,
+    "mid": 70005.0,
+    "vol_annualized": 0.6,
+    "formula_version": "tick_v2_window_aware",
+    "floor_curve": "1.00+0.0000*tau"
+  },
+  "settlement": {
+    "outcome": "WON",
+    "touch_seq": 1,
+    "touch_mid": 70005.0,
+    "evidence_ticks": [
+      {
+        "seq": 0,
+        "ts_ms": 1000,
+        "mid": 69990.0
+      },
+      {
+        "seq": 1,
+        "ts_ms": 3000,
+        "mid": 70005.0
+      }
+    ],
+    "settled_at_ms": 3000,
+    "sui_tx_digest": "EXAMPLEdigest1111111111111111111111111111111"
+  }
+}

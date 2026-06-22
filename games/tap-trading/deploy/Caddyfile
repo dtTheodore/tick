@@ -1,0 +1,11 @@
+# Caddy auto-provisions and renews a Let's Encrypt cert for $PUBLIC_HOST and
+# reverse-proxies the API. WebSocket upgrades (/stream) pass through untouched —
+# Caddy needs no special config for them. Requires inbound 80 + 443 on the host.
+#
+# PUBLIC_HOST is e.g. "<elastic-ip>.sslip.io" (free, no domain) or your own
+# domain. A bare IP cannot get a public cert — use a hostname.
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+	reverse_proxy api:8080
+}

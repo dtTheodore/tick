@@ -1,0 +1,9 @@
+[package]
+name = "tick_e2e_coin"
+edition = "2024.beta"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+tick_e2e_coin = "0x0"

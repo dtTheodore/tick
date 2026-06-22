@@ -1,0 +1,31 @@
+name: Deploy Dev
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.service }} (Dev)
+    runs-on: ubuntu-latest
+    environment: dev
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: dopamint-dashboard-dev
+          - service: dopamint-game-2048-dev
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Token
+        if: env.RAILWAY_TOKEN == ''
+        run: |
+          echo "Error: RAILWAY_TOKEN is empty or missing"
+          exit 1
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy ${{ matrix.service }}
+        run: railway up --service ${{ matrix.service }} --detach

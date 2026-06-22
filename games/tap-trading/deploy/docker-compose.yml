@@ -1,0 +1,173 @@
+# Production stack for the tap-trading (Tick) backend on a single Docker host
+# (e.g. one AWS EC2 box). Postgres + Redis run as local containers; only Caddy
+# is published to the host (80/443) — everything else talks over the internal
+# `tick` network. Values come from ./.env (see .env.example); nothing is
+# hardcoded so the same file works on any box.
+#
+#   docker compose --env-file .env up -d --build
+#
+# The frontend is NOT here — it deploys separately to Cloudflare Pages.
+
+name: tick
+
+networks:
+  tick:
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [tick]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    networks: [tick]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: applies embedded migrations, then exits 0. Gates api + worker.
+  migrate:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: migrate
+    command: ["run"]
+    environment:
+      TAP_DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RUST_LOG: ${RUST_LOG}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [tick]
+    restart: "no"
+
+  # Holds the upstream exchange WebSockets (Binance/Bybit/OKX/Pyth) and serves
+  # the merged tick stream the api + worker subscribe to. No DB.
+  oracle-aggregator:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: aggregator
+    environment:
+      TAP_AGGREGATOR_PORT: "8081"
+      RUST_LOG: ${RUST_LOG}
+    networks: [tick]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: api
+    environment:
+      TAP_API_PORT: "8080"
+      TAP_DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      TAP_REDIS_URL: redis://redis:6379
+      TAP_AGGREGATOR_URL: http://oracle-aggregator:8081
+      RUST_LOG: ${RUST_LOG}
+    # USDC deposit (RPC verify) + withdraw (operator signs via sui CLI). The vars
+    # live in an OPTIONAL onchain.env: absent ⇒ points-only (/v1/deposit + /v1/withdraw
+    # stay hidden client-side); present ⇒ USDC. Must be unset (not empty) for
+    # points-only, which an absent file gives — inline empties would not.
+    env_file:
+      - path: ./onchain.env
+        required: false
+    volumes:
+      # withdraw signs as the operator's active sui address — same keystore as the worker.
+      - ${SUI_CONFIG_DIR:-./secrets/sui}:/root/.sui
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      oracle-aggregator:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [tick]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Settlement worker — settles positions OFF-CHAIN (DB balance). Batched Walrus
+  # proof publishing (ADR-0011) is gated by TICK_PROOFS_ENABLED: it defaults ON in
+  # code, so we pin it false here for points-only (no walrus wallet/config needed).
+  # Set TICK_PROOFS_ENABLED=true in .env + provide walrus config to enable proofs.
+  # USDC deposit/withdraw config (for the api) lives in the optional onchain.env.
+  settlement-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: worker
+    environment:
+      TAP_DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      TAP_AGGREGATOR_WS_URL: ws://oracle-aggregator:8081/stream
+      TAP_WORKER_METRICS_PORT: "8082"
+      TICK_PROOFS_ENABLED: ${TICK_PROOFS_ENABLED:-false}
+      RUST_LOG: ${RUST_LOG}
+    env_file:
+      - path: ./onchain.env
+        required: false
+    volumes:
+      - ${SUI_CONFIG_DIR:-./secrets/sui}:/root/.sui
+      - ${WALRUS_CONFIG_DIR:-./secrets/walrus}:/root/.config/walrus
+    depends_on:
+      postgres:
+        condition: service_healthy
+      oracle-aggregator:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [tick]
+    restart: unless-stopped
+
+  # Public edge: terminates TLS (auto Let's Encrypt for $PUBLIC_HOST) and proxies
+  # the API + WebSocket. The only service published to the host.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [tick]

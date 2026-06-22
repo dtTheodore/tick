@@ -1,0 +1,20 @@
+[package]
+name = "tap-trading-proof-verifier"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "proof-verify"
+path = "src/bin/proof_verify.rs"
+
+[dependencies]
+tap-trading-proof-types = { workspace = true }
+tap-trading-pricing-engine = { workspace = true }
+tap-trading-touch = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,32 @@
+# worktree-local state (per cmk-worktree-dev-env)
+.local/
+tmp/
+.superpowers/
+.claude/worktrees/
+
+# bun / node
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# rust
+target/
+Cargo.lock.bak
+
+# sui / move
+build/
+*.mv
+
+# editors / os
+.DS_Store
+.idea/
+.vscode/
+!.vscode/settings.json
+*.log
+
+# env files at well-known service paths (canonical envs live in .local/)
+**/.env
+**/.env.local
+!**/.env.example

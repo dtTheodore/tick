@@ -1,0 +1,61 @@
+# Interactive process multiplexer config for human dev sessions.
+#   mprocs --config mprocs.yaml
+#
+# Each process sources the worktree env, runs the coherence guard, then
+# starts the service in watch mode. Live-reload tooling (cargo watch,
+# vite dev) is mandatory — no plain `cargo run`.
+
+procs:
+  postgres:
+    shell: |
+      set -e
+      source ./scripts/worktree-env.sh
+      ./scripts/ensure-worktree-coherence.sh --quiet
+      docker compose up -d postgres
+      docker compose logs -f postgres
+
+  redis:
+    shell: |
+      set -e
+      source ./scripts/worktree-env.sh
+      ./scripts/ensure-worktree-coherence.sh --quiet
+      docker compose up -d redis
+      docker compose logs -f redis
+
+  tap-migrate:
+    shell: |
+      set -e
+      source ./scripts/worktree-env.sh
+      ./scripts/ensure-worktree-coherence.sh --quiet
+      # One-shot: runs migrations and exits. Re-run on demand from mprocs UI.
+      cargo run -p tap-trading-migrate --manifest-path games/tap-trading/backend/Cargo.toml -- run
+
+  tap-aggregator:
+    shell: |
+      set -e
+      source ./scripts/worktree-env.sh
+      ./scripts/ensure-worktree-coherence.sh --quiet
+      cargo watch --workdir games/tap-trading/backend -x 'run -p tap-trading-oracle-aggregator'
+
+  tap-worker:
+    shell: |
+      set -e
+      source ./scripts/worktree-env.sh
+      ./scripts/ensure-worktree-coherence.sh --quiet
+      cargo watch --workdir games/tap-trading/backend -x 'run -p tap-trading-settlement-worker'
+
+  tap-api:
+    shell: |
+      set -e
+      source ./scripts/worktree-env.sh
+      ./scripts/ensure-worktree-coherence.sh --quiet
+      cargo watch --workdir games/tap-trading/backend -x 'run -p tap-trading-api'
+
+  tap-ui:
+    shell: |
+      set -e
+      source ./scripts/worktree-env.sh
+      ./scripts/ensure-worktree-coherence.sh --quiet
+      cd games/tap-trading/ui
+      bun install
+      bun run dev

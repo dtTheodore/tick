@@ -1,0 +1,14 @@
+[package]
+name = "tick_vault"
+edition = "2024.beta"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+tick_vault = "0x0"
+# Circle native USDC. Testnet address shown; mainnet swaps to
+# 0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7.
+# Unit tests use a test-only coin, so this only binds at deploy time and
+# is only used when the vault is instantiated GameVault<usdc::USDC>.
+usdc = "0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29"

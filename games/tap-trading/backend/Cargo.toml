@@ -1,0 +1,97 @@
+[workspace]
+resolver = "2"
+members = [
+    "pricing-engine",
+    "oracle-types",
+    "oracle-aggregator",
+    "migrate",
+    "api",
+    "settlement-worker",
+    "touch",
+    "proof-types",
+    "proof-verifier",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.94"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+proptest = "1.5"
+libm = "0.2"
+
+# Runtime
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "signal", "net", "process", "fs"] }
+
+# HTTP + WS
+axum = { version = "0.7", features = ["ws", "macros", "tokio"] }
+tokio-tungstenite = { version = "0.21", features = ["rustls-tls-webpki-roots"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+reqwest-eventsource = "0.6"
+async-trait = "0.1"
+
+# In-memory state
+dashmap = "6.0"
+futures = "0.3"
+futures-util = "0.3"
+
+# Database
+sqlx = { version = "0.9", default-features = false, features = [
+    "postgres",
+    "runtime-tokio",
+    "tls-rustls",
+    "migrate",
+    "chrono",
+    "macros",
+    "uuid",
+    "bigdecimal",
+] }
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Tower middleware
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+
+# Redis
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+
+# Metrics
+prometheus = { version = "0.13", default-features = false }
+
+# UUIDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Integration-test infra (only used as dev-dep, but pinned at workspace level)
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["postgres"] }
+wiremock = "0.6"
+
+# Workspace-internal crates
+tap-trading-oracle-types = { path = "oracle-types" }
+tap-trading-pricing-engine = { path = "pricing-engine" }
+tap-trading-touch = { path = "touch" }
+tap-trading-proof-types = { path = "proof-types" }
+tap-trading-proof-verifier = { path = "proof-verifier" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dev]
+opt-level = 0
+debug = true

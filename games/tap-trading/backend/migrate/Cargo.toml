@@ -1,0 +1,28 @@
+[package]
+name = "tap-trading-migrate"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "tap-trading-migrate"
+path = "src/main.rs"
+
+[lib]
+name = "tap_trading_migrate"
+path = "src/lib.rs"
+
+[dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+testcontainers = { workspace = true }
+testcontainers-modules = { workspace = true }

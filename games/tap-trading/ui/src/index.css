@@ -1,0 +1,534 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/bricolage-grotesque";
+
+@theme {
+  --color-tick-bg: #0a0a0a;
+  --color-tick-pink: #ff2d7e;
+  --color-tick-win: #00ff88;
+  --color-tick-loss: #ff3030;
+  --color-tick-info: #00b8ff;
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-mono: "Space Grotesk Variable", ui-monospace, monospace;
+  /* Landing display face for marketing headlines only. Numerics, the wordmark,
+     and all game UI stay on Space Grotesk (--font-mono) for brand cohesion with
+     /play; body copy stays Inter. */
+  --font-display: "Bricolage Grotesque Variable", "Space Grotesk Variable", sans-serif;
+
+  /* Landing-page tokens. Surfaces tint the near-black (pure #0a0a0a reads flat);
+     Sui-blue is reserved for the "Built on Sui" + fairness sections as the
+     ecosystem credibility anchor, never as general decoration. */
+  --color-lp-bg: #0a0a0c;
+  --color-lp-raised: #121116;
+  --color-lp-pink: #ff2d7e;
+  --color-lp-green: #00ff88;
+  --color-lp-loss: #ff3030;
+  --color-lp-sui-blue: #4da2ff;
+  --color-lp-sui-pink: #fe8bc2;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+body {
+  font-family: var(--font-sans);
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+.shake {
+  animation: shake 150ms ease-in-out;
+}
+
+/* Win: a quick over-scale snap with an expanding green halo, then settle. Fires
+   the instant the line enters the cell (optimistic, see Cell/useLiveHitDetection)
+   so the celebration lands on the touch, not ~½s later on the settlement poll. */
+@keyframes winflash {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0);
+  }
+  22% {
+    transform: scale(1.26);
+    box-shadow: 0 0 40px 12px rgba(0, 255, 136, 0.75), 0 0 80px 26px rgba(0, 255, 136, 0.22);
+  }
+  44% {
+    transform: scale(0.96);
+    box-shadow: 0 0 20px 5px rgba(0, 255, 136, 0.5);
+  }
+  62% {
+    transform: scale(1.08);
+    box-shadow: 0 0 30px 8px rgba(0, 255, 136, 0.55);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 12px 0 rgba(0, 255, 136, 0.32);
+  }
+}
+
+/* Win celebration overlay — shockwave rings + spark burst emitted from the struck
+   cell's centre. Cell-anchored DOM (mounts once, keyed off struckAtMs) so it can
+   never desync from settlement. Base opacity 0 means reduced-motion (animation
+   disabled below) leaves them invisible rather than frozen mid-burst. */
+.tick-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 9999px;
+  border: 2px solid rgba(0, 255, 136, 0.9);
+  opacity: 0;
+  animation: tick-ringblast 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.tick-ring-2 {
+  animation-delay: 90ms;
+  border-color: rgba(0, 255, 136, 0.5);
+}
+@keyframes tick-ringblast {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(7);
+    opacity: 0;
+  }
+}
+.tick-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 9999px;
+  background: var(--color-tick-win);
+  box-shadow: 0 0 8px 1px rgba(0, 255, 136, 0.9);
+  opacity: 0;
+  animation: tick-sparkfly 760ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes tick-sparkfly {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tick-dx), var(--tick-dy)) scale(0.2);
+    opacity: 0;
+  }
+}
+
+/* Locked bet breathes so the player's own position reads as live, not static. */
+@keyframes lockpulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(255, 45, 126, 0.45), 0 0 12px rgba(255, 45, 126, 0.18);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(255, 45, 126, 0.7), 0 0 22px rgba(255, 45, 126, 0.42);
+  }
+}
+.tick-locked-pulse {
+  animation: lockpulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tick-ring,
+  .tick-spark,
+  .tick-locked-pulse {
+    animation: none !important;
+  }
+}
+
+/* /play atmosphere: lifts the flat body #0a0a0a into a premium dark stage — a
+   faint pink glow up top (where the wordmark and price sit) and a vignette toward
+   the edges, while the chart's mid-band stays clean. Pure CSS background (paints
+   behind content, no stacking concerns); the game route opts in via .tick-play. */
+.tick-play {
+  background: radial-gradient(115% 75% at 50% -8%, rgba(255, 45, 126, 0.08), transparent 55%),
+    radial-gradient(120% 120% at 50% 112%, rgba(0, 0, 0, 0.55), transparent 60%), #0a0a0a;
+}
+
+/* Recent-results tape: a new settled chip slides in from the left as it lands,
+   so the strip reads as a live tape. Only freshly-mounted chips (new key) run
+   this; reused nodes don't re-animate. Compositor-only (transform/opacity). */
+@keyframes tick-hist-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tick-hist-in {
+  animation: tick-hist-in 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick-hist-in {
+    animation: none;
+  }
+}
+
+/* ── Landing-page motion & atmosphere ──────────────────────────────────────
+   Every animation here is transform/opacity-only (compositor tier). The hero
+   glow pulses by animating the OPACITY of a pre-blurred layer, never the blur
+   radius — animating blur/box-shadow on a live element repaints every frame. */
+
+@keyframes lp-reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.lp-reveal {
+  opacity: 0;
+}
+.lp-reveal.is-visible {
+  animation: lp-reveal-up 640ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes lp-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+.lp-glow-pulse {
+  animation: lp-glow-pulse 6s ease-in-out infinite;
+}
+
+/* Faint glowing 1px price-grid — on-brand because the product is a price grid. */
+.lp-grid-bg {
+  background-image: linear-gradient(to right, rgba(255, 45, 126, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 45, 126, 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+}
+
+/* Anchored sections sit below the sticky nav without being hidden by it. */
+.lp-anchor {
+  scroll-margin-top: 88px;
+}
+
+/* Fine film grain to kill gradient banding on the dark surfaces (a premium-dark
+   staple). Pure overlay; pointer-events-none at the call site. */
+.lp-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.04;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-reveal,
+  .lp-reveal.is-visible {
+    opacity: 1 !important;
+    animation: none !important;
+  }
+  .lp-glow-pulse {
+    animation: none !important;
+  }
+}
+
+/* Payout reward burst on a win: "+points" springs up off the cell and fades. */
+@keyframes winpop {
+  0% {
+    transform: translateY(8px) scale(0.5);
+    opacity: 0;
+  }
+  14% {
+    transform: translateY(-6px) scale(1.32);
+    opacity: 1;
+  }
+  44% {
+    transform: translateY(-22px) scale(1.04);
+    opacity: 1;
+  }
+  72% {
+    transform: translateY(-38px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-54px) scale(0.92);
+    opacity: 0;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Landing page — premium atmosphere & motion. ADDITIVE + landing-scoped
+   (every selector is `lp-*`). The game at /play never sees these rules.
+   All animation is compositor-only (transform/opacity); the static textures
+   (grid, scanlines, vignette) don't animate. Reduced-motion overrides sit at
+   the end of this block.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Rotating-angle custom prop drives the aurora border on key cards (hover). */
+@property --lp-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ── Reveal variants (the base .lp-reveal lives higher up) ───────────────── */
+@keyframes lp-reveal-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.965) translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.lp-reveal-scale {
+  opacity: 0;
+}
+.lp-reveal-scale.is-visible {
+  animation: lp-reveal-scale 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Price-grid background, refined ──────────────────────────────────────
+   Two-scale grid (fine + bold lines) masked to a soft vignette so it reads as
+   a focused instrument rather than wallpaper. Pairs with .lp-scanbeam.
+
+   The grid + its vignette mask MUST live on a decorative ::before, never on the
+   host directly: a mask clips and blurs everything it's applied to, so masking
+   the content box fades and blurs the foreground text in the mask's transparent
+   zone. The pseudo holds only the grid; `isolation: isolate` makes the host a
+   stacking context so the z-index:-10 layer stays behind content but above the
+   host background. */
+.lp-grid-precise {
+  position: relative;
+  isolation: isolate;
+}
+.lp-grid-precise::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background-image: linear-gradient(to right, rgba(255, 45, 126, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 45, 126, 0.04) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 46px 46px, 46px 46px, 230px 230px, 230px 230px;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 8%, #000 38%, transparent 92%);
+  mask-image: radial-gradient(120% 90% at 50% 8%, #000 38%, transparent 92%);
+}
+
+/* Oscilloscope sweep: a soft pink band that drifts down through the grid. The
+   band is 180px tall and over-travels (1100%) so it exits the bottom and pauses
+   before the next pass — a slow, instrument-like heartbeat, not a strobe. */
+@keyframes lp-scanbeam {
+  0% {
+    transform: translateY(-180px);
+    opacity: 0;
+  }
+  8%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(1100%);
+    opacity: 0;
+  }
+}
+.lp-scanbeam {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 180px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 45, 126, 0.07), transparent);
+  animation: lp-scanbeam 9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform, opacity;
+}
+
+/* Fine CRT scanlines — static texture, no animation. Almost subliminal. */
+.lp-scanlines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.012) 0px,
+    rgba(255, 255, 255, 0.012) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* ── Ticker marquee (built-with strip) ──────────────────────────────────── */
+@keyframes lp-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.lp-marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+.lp-marquee-track {
+  display: inline-flex;
+  width: max-content;
+  animation: lp-marquee 42s linear infinite;
+  will-change: transform;
+}
+.lp-marquee:hover .lp-marquee-track {
+  animation-play-state: paused;
+}
+
+/* ── Aurora border on hover (feature/bento cards) ───────────────────────── */
+.lp-card {
+  position: relative;
+  isolation: isolate;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), border-color 320ms ease;
+}
+.lp-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--lp-angle),
+    transparent 0deg,
+    var(--lp-aurora, rgba(255, 45, 126, 0.7)) 70deg,
+    transparent 150deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 360ms ease;
+  z-index: -1;
+}
+.lp-card:hover {
+  transform: translateY(-4px);
+}
+.lp-card:hover::before {
+  opacity: 1;
+  animation: lp-spin 4s linear infinite;
+}
+@keyframes lp-spin {
+  to {
+    --lp-angle: 360deg;
+  }
+}
+
+/* ── Primary CTA: diagonal light sweep on hover ─────────────────────────── */
+.lp-shine {
+  position: relative;
+  overflow: hidden;
+}
+.lp-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.35) 48%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  transition: transform 720ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.lp-shine:hover::after {
+  transform: translateX(130%);
+}
+
+/* Soft pulsing dot used for "live" indicators. */
+@keyframes lp-live {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.45;
+  }
+}
+.lp-live-dot {
+  animation: lp-live 1.8s ease-in-out infinite;
+}
+
+/* Top-of-page scroll progress bar fill (width set inline via transform-scale). */
+.lp-progress {
+  transform-origin: left;
+  will-change: transform;
+}
+
+/* Pipeline "data flow": a blip rides a full-width wrapper, so translateX(100%)
+   carries it exactly one rail-width regardless of viewport. Compositor-only. */
+@keyframes lp-flow {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  10%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+.lp-flow-dot {
+  animation: lp-flow 3.4s linear infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-reveal-scale,
+  .lp-reveal-scale.is-visible {
+    opacity: 1 !important;
+    animation: none !important;
+  }
+  .lp-scanbeam,
+  .lp-marquee-track,
+  .lp-live-dot,
+  .lp-flow-dot,
+  .lp-card:hover::before {
+    animation: none !important;
+  }
+  .lp-flow-dot {
+    display: none;
+  }
+  .lp-scanbeam {
+    display: none;
+  }
+  .lp-shine::after {
+    display: none;
+  }
+}
