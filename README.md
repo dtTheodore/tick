@@ -37,9 +37,7 @@ games/tap-trading/
 ├── move/tick_vault/   # Sui Move custody + settlement contract
 ├── backend/           # Rust: api · oracle-aggregator · settlement-worker · migrate
 ├── ui/                # React frontend (the live chart + game)
-├── deploy/            # Docker Compose + deploy runbook
-└── docs/              # math + design specs
-docs/decisions/        # architecture decision records (ADRs)
+└── deploy/            # Docker Compose + deploy runbook
 ```
 
 ## Run it
