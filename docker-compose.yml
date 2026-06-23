@@ -1,9 +1,7 @@
-# Per-worktree local infrastructure.
+# Local Postgres for development.
 #
-# Container names and the data volume bind-mount are namespaced by
-# COMPOSE_PROJECT_NAME (set by scripts/worktree-env.sh), so multiple
-# worktrees of this repo can run side-by-side without colliding.
-# Data lives under ./.local/postgres-data and is gitignored.
+# Host port comes from $PLATFORM_DB_PORT; data lives under
+# ./.local/postgres-data (gitignored).
 
 services:
   postgres:
